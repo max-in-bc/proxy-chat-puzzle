@@ -12,6 +12,26 @@ communicate through an IRC style chat.
 *Files Included:* src/proxy.c, src/proxychat.c, include/proxy.h, include/proxychat.h, Makefile, README.txt, A1_docs
 
 
+******************************************************
+The Proxy Chat - IRC Style Shared Memory Chat Client
+******************************************************
+**TO COMPILE**
+
+	$ make
+	from the Makefile dir, THEN 'bin/proxy' and 'bin/proxychat' WILL BE CREATED
+
+**TO START PROXY**
+
+	$ bin/proxy
+	 to start the proxy, any chat clients should take note of the printed PID
+
+**TO START CHAT CLIENTS**
+
+	$ bin/proxychat n
+	 WHERE n is replaced to the pid of the proxy
+
+
+
 The Problem
 --
 
@@ -120,25 +140,6 @@ Decisions/Assumptions/Justifications
 *PASSED: Message longer than 1024 characters , only first 1024 chars sent in first message and rest in latter message(s)
 
 *PASSED: Message is freed
-
-
-******************************************************
-The Proxy Chat - IRC Style Shared Memory Chat Client
-******************************************************
-**TO COMPILE**
-
-	$ make
-	from the Makefile dir, THEN 'bin/proxy' and 'bin/proxychat' WILL BE CREATED
-
-**TO START PROXY**
-
-	$ bin/proxy
-	 to start the proxy, any chat clients should take note of the printed PID
-
-**TO START CHAT CLIENTS**
-
-	$ bin/proxychat n
-	 WHERE n is replaced to the pid of the proxy
 
 NOTES:
 --
