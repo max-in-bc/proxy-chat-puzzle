@@ -1,31 +1,165 @@
+Description
+-----------
+Using 2 executables -a proxy, and proxychat- that are connected through shared memory segments and signals, chat clients
+communicate through an IRC style chat.
+
+**Details**
+
+*Problem Author:* CIS3110 TA
+
+*Source Author:* Max Gardiner
+
+*Files Included:* src/proxy.c, src/proxychat.c, include/proxy.h, include/proxychat.h, Makefile, README.txt, A1_docs
+
+
+The Problem
+--
+
+ "In a misguided attempt at security, the operating system has been configured
+ such that standard I/O channels, including the file system, are blocked to all
+ processes."
+
+ We would like to be able to use signals and shared memory to circumvent the draconian security
+
+ Using 2 shared memory segments only and communication through the proxy program,
+ the clients must be able to communicate with eachother fully.
+
+Solution
+--
+
+ My solution deals with a proxy that is in a constant wait state, after it prints its
+ PID for proxychats to use. The proxy also creates two shared memory segments using the
+ proxy PID as the key, one with words (1024 bytes) and one for an integer (4 bytes)
+
+ Each proxychat must be started up with the PID of the proxy, that way the shared memory
+ can be located. It then also goes into a state of constant wait. If the proxychat wishes
+ to send a message, it signals the proxy - which then signals every other proxy chat that
+ there is a new message. If a chat client exits or enters, the proxy will print which client
+ entered or exited the chatroom and they become added/removed from the clientlist.
+
+ CTRL+c or CTRL+z are the only way to end proxy or proxychat
+
+Design Notes
+--
+
+*When proxy first starts:
+    -Allocates shared memory areas
+    -Prints it's own PID
+    -Sets up handler functions for SIGUSR1, SIGUSR2, and SIGCONT
+
+ Then it enters an infinite loop waiting for signals from the client processes
+
+*When proxychat initializes, it sets up it's handlers and shared memory, then:
+    -Prints own PID and saves it to shared integer
+    -Send SIGUSR1 to proxy (signalling a new client)
+    -Enter infinite loop
+
+ It then awaits user input terminated by the return key. It then saves the message
+ to the shared memory and the pid of whoever sent the message in the shared int, at
+ which point is sends a SIGUSR2 to the proxy, indicating that it has accessed the shared memory.
+
+ When SIGUSR2 is handled by the proxy, it loops through the list of client PIDs, sending SIGUSR1
+ to each client whose PID is not equal to the integer in the shared int.
+
+ If a client recieves a SIGUSR1, it prints the PID located in the shared int, followed by the message
+ in the shared message.
+
+ *To handle multiple signals at once, the message handler turns into an SIG IGN while the handler runs,
+ at the end the handler is returned to the signal
+
+*When a proxychat terminates, it sends a SIGCONT to proxy first, telling it to
+ remove it's PID from the list of active clients, and print such info
+
+Decisions/Assumptions/Justifications
+--
+
+#1 The longest a single message will be is 1024 characters
+    *Anything longer will be truncated to furthar message(s)
+
+#2 The default # of maximum clients is 20
+    *can be any int >0
+
+#3 The argument to proxychat instance will be a valid proxy PID
+    *Program is not robust enough to check validity of the given PID
+    *Fair to assume that end-user will not use proxychat to send random sigs
+
+#4 The shared memory will not be modified by any programs othe than proxy and chat clients
+    *If other program modifies it it will result in undefined behaviour
+
+#5 If proxy is terminated, connected clients will lose access to one another
+    *If the server goes down, clients can't ping eachother
+
+#6 Chat clients will be waiting specifically for the signal to get a new message
+    *The only client that is not given the signal is the one who sent a signal to the proxy
+
+#7 The proxy waits for 3 signals
+    *One for adding new clients
+    *One for getting new messages and telling other clients of the new message
+    *One for exitting clients
+
+#8 In order to close the "correct" way use SIGINT or CTRL+C
+    *This successfully removes clients from client list and frees message memory
+    *Not necessary, as the client and proxy will run fine after a client exits with SIGTERM
+
+== Testing ==
+
+*PASSED: Queuing multiple messages by adding a long sleep() in the handler
+
+*PASSED: Terminating client informs proxy of termination
+
+*PASSED: New proxychat instance is added to client list and printed by proxy
+
+*PASSED: Assert that a PID is given when starting proxychat
+
+*PASSED: Proxy successfully continues to signal until it's signal is not ignored
+
+*PASSED: Only one process has access to shared memory at a time
+
+*PASSED: Proxy does not segfault on disconnect of one or more clients
+
+*PASSED: Message longer than 1024 characters , only first 1024 chars sent in first message and rest in latter message(s)
+
+*PASSED: Message is freed
+
+
 ******************************************************
 The Proxy Chat - IRC Style Shared Memory Chat Client
 ******************************************************
-##TO COMPILE##
-	TYPE 'make' from the Makefile dir, THEN 'bin/proxy' and 'bin/proxychat' WILL BE CREATED
+**TO COMPILE**
 
-##TO START PROXY##
-	TYPE 'bin/proxy' to start the proxy, any chat clients should take note of the printed PID
+	$ make
+	from the Makefile dir, THEN 'bin/proxy' and 'bin/proxychat' WILL BE CREATED
 
-##TO START CHAT CLIENTS##
-	TYPE 'bin/proxychat ####" WHERE '####' is replaced to the pid of the proxy --This must be run in a different 
-	terminal than proxy or any other chat client
+**TO START PROXY**
 
-NOTE: IN ORDER TO CHANGE THE DEFAULT NUMBER OF MAXIMUM PROXIES, CHANGE THE PREPROCESSOR #DEFINE IN "proxy.c", DEFAULT IS 20
+	$ bin/proxy
+	 to start the proxy, any chat clients should take note of the printed PID
 
-SRC DIRECTORY:
-    proxy.c - is the file that starts the shared memory segments, and keeps track of all the chat clients
-    proxychat.c - is the file that tells the proxy it is a new client, or tells the proxy it has a new message to send
+**TO START CHAT CLIENTS**
 
-INCLUDE DIRECTORY:
-    proxy.h - proxy header file
-    proxychat.h - proxy chat header file
+	$ bin/proxychat n
+	 WHERE n is replaced to the pid of the proxy
+
+NOTES:
+--
+- IN ORDER TO CHANGE THE DEFAULT NUMBER OF MAXIMUM PROXIES, CHANGE THE PREPROCESSOR #DEFINE IN "proxy.c", DEFAULT IS 20
+
+All Files Included
+--
+
+1. SRC DIRECTORY:
+    - *proxy.c* - is the file that starts the shared memory segments, and keeps track of all the chat clients
+    - *proxychat.c* - is the file that tells the proxy it is a new client, or tells the proxy it has a new message to send
+
+2. INCLUDE DIRECTORY:
+    - *proxy.h* - proxy header file
+    - *proxychat.h* - proxy chat header file
     
-BIN DIRECTORY:
-    proxy - the executable proxy
-    proxychat - the executable proxychat
+3. BIN DIRECTORY:
+    - *proxy* - the executable proxy
+    - *proxychat* - the executable proxychat
     
-MAIN DIRECTORY:
-    MAKEFILE - type "make", "make all", or "make lockdown" to build proxy and proxychat
-    README.txt - quick directory info on all files, and how to run the proxy chat
-    A1_docs.pdf - info of the problem, and brief description of my solution, and any special design notes/algorithms
+4. MAIN DIRECTORY:
+    - *MAKEFILE* - type "make", "make all", or "make lockdown" to build proxy and proxychat
+    - *README.txt* - quick directory info on all files, and how to run the proxy chat
+    = *A1_docs.pdf* - info of the problem, and brief description of my solution, and any special design notes/algorithms
